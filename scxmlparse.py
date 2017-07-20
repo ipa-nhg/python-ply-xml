@@ -8,176 +8,7 @@ from ply import lex, yacc
 
 _VERSION = '1.0'
 
-
-################################
-# LEXER
-
-
-class XmlLexer:
-    '''The XML lexer'''
-
-    # states:
-    #   default:    The default context, non-tag
-    #   tag:        The document tag context
-    #   attrvalue1: Single-quoted tag attribute value
-    #   attrvalue2: Double-quoted tag attribute value
-
-    states = (
-        ('tag', 'exclusive'),
-        ('attrvalue1', 'exclusive'),
-        ('attrvalue2', 'exclusive'),
-    )
-
-    tokens = [
-
-        # state: INITIAL
-        'PCDATA',
-        'OPENTAGOPEN',
-        'CLOSETAGOPEN',
-
-        # state: tag
-        'TAGATTRNAME',
-        'TAGCLOSE',
-        'LONETAGCLOSE',
-        'ATTRASSIGN',
-
-        # state: attrvalue1
-        'ATTRVALUE1OPEN',
-        'ATTRVALUE1STRING',
-        'ATTRVALUE1CLOSE',
-
-        # state: attrvalue2
-        'ATTRVALUE2OPEN',
-        'ATTRVALUE2STRING',
-        'ATTRVALUE2CLOSE',
-
-    ]
-
-
-    # Complex patterns
-    re_digit       = r'([0-9])'
-    re_nondigit    = r'([_A-Za-z])'
-    re_identifier  = r'(' + re_nondigit + r'(' + re_digit + r'|' + re_nondigit + r')*)'
-
-
-    # ANY
-
-    def t_ANY_error(self, t):
-        raise SyntaxError("Illegal character '%s'" % t.value[0])
-        t.lexer.skip(1)
-        pass
-
-
-    # INITIAL
-
-    t_ignore  = ''
-
-    def t_CLOSETAGOPEN(self, t):
-        r'</'
-        t.lexer.push_state('tag')
-        return t
-
-    def t_OPENTAGOPEN(self, t):
-        r'<'
-        t.lexer.push_state('tag')
-        return t
-
-    def t_PCDATA(self, t):
-        '[^<]+'
-        return t
-
-
-    # tag: name
-
-    t_tag_ignore  = ' \t'
-
-    def t_tag_TAGATTRNAME(self, t):
-        return t
-    t_tag_TAGATTRNAME.__doc__ = re_identifier
-
-    def t_tag_TAGCLOSE(self, t):
-        r'>'
-        t.lexer.pop_state()
-        return t
-
-    def t_tag_LONETAGCLOSE(self, t):
-        r'/>'
-        t.lexer.pop_state()
-        return t
-
-
-    # tag: attr
-
-    t_tag_ATTRASSIGN    = r'='
-
-    def t_tag_ATTRVALUE1OPEN(self, t):
-        r'\''
-        t.lexer.push_state('attrvalue1')
-        return t
-
-    def t_tag_ATTRVALUE2OPEN(self, t):
-        r'"'
-        t.lexer.push_state('attrvalue2')
-        return t
-
-
-    # attrvalue1
-
-    def t_attrvalue1_ATTRVALUE1STRING(self, t):
-        r'[^\']+'
-        t.value = unicode(t.value)
-        return t
-
-    def t_attrvalue1_ATTRVALUE1CLOSE(self, t):
-        r'\''
-        t.lexer.pop_state()
-        return t
-
-    t_attrvalue1_ignore  = ''
-
-
-    # attrvalue2
-
-    def t_attrvalue2_ATTRVALUE2STRING(self, t):
-        r'[^"]+'
-        t.value = unicode(t.value)
-        return t
-
-    def t_attrvalue2_ATTRVALUE2CLOSE(self, t):
-        r'"'
-        t.lexer.pop_state()
-        return t
-
-    t_attrvalue2_ignore  = ''
-
-
-    # misc
-
-    literals = '$%^'
-
-    def t_ANY_newline(self, t):
-        r'\n'
-        t.lexer.lineno += len(t.value)
-
-
-    # Build the lexer
-    def build(self, **kwargs):
-        self.lexer = lex.lex(object=self, **kwargs)
-
-    # Test it output
-    def test(self, data):
-        self.lexer.input(data)
-
-        while 1:
-            tok = self.lexer.token()
-            if not tok: break
-            _debug_print_('LEXER', '[%-12s] %s' % (self.lexer.lexstate, tok))
-
-
-# Customization
-class SyntaxError(Exception):
-    pass
-
+import scxmllex
 
 ################################
 # PARSER
@@ -380,7 +211,6 @@ def _xml_unescape(s):
 
     return s
 
-
 ################################
 # INTERFACE
 
@@ -391,7 +221,7 @@ def xml_parse(data):
     _debug_footer('INPUT')
 
     # Tokenizer
-    xml_lexer = XmlLexer()
+    xml_lexer = scxmllex.XmlLexer()
     xml_lexer.build()
 
     _debug_header('LEXER')
@@ -400,12 +230,12 @@ def xml_parse(data):
 
     # Parser
     global tokens
-    tokens = XmlLexer.tokens
+    tokens = scxmllex.XmlLexer.tokens
 
     yacc.yacc(method="SLR")
 
     _debug_header('PARSER')
-    root = yacc.parse(data, lexer=xml_lexer.lexer, debug=False)
+    root = yacc.parse(data, lexer=xml_lexer.lexer, debug=True)
     _debug_footer('PARSER')
 
     _debug_header('OUTPUT')
@@ -413,35 +243,6 @@ def xml_parse(data):
     _debug_footer('OUTPUT')
 
     return root
-
-
-def tree(node, level=0, init_prefix=''):
-    'Returns a tree view of the XML data'
-
-    prefix = '    '
-    attr_prefix = '@'
-    tag_postfix = ':\t'
-    attr_postfix = ':\t'
-
-    s_node = init_prefix + node.name + tag_postfix
-    s_attributes = ''
-    s_children = ''
-
-    for attr in node.attributes:
-        s_attributes += init_prefix + prefix + attr_prefix + attr + attr_postfix + node.attributes[attr] + '\n'
-
-    if len(node.children) == 1 and not isinstance(node.children[0], DOM.Element):
-        s_node += node.children[0] + '\n'
-
-    else:
-        for child in node.children:
-            if isinstance(child, DOM.Element):
-                s_children += tree(child, level+1, init_prefix + prefix)
-
-        s_node += '\n'
-
-    return s_node + s_attributes + s_children
-
 
 ################################
 # DEBUG
@@ -465,16 +266,4 @@ def _debug_footer(part):
 def _debug_print_(part, s):
     if _DEBUG[part]:
         print s
-
-
-################################
-# MAIN
-
-def main():
-    data = open(sys.argv[1]).read()
-    root = xml_parse(data)
-    print tree(root)
-
-if __name__ == '__main__':
-    main()
 

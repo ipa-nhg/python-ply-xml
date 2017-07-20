@@ -1,0 +1,11 @@
+<scxml name="SCXML" xmlns="http://www.w3.org/2005/07/scxml">
+ <state id="foo">
+    <transition event="outcome1" target="bar"/>
+    <transition event="outcome4" target="outcome4"/>
+ </state>
+
+ <state id="bar">
+    <transition event="outcome1" target="foo"/>
+ </state>
+
+</scxml>

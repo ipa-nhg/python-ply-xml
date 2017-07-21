@@ -44,7 +44,7 @@ def tree(node, level=0, init_prefix=''):
 # DEBUG
 
 _DEBUG = {
-    'INPUT': True,
+    'INPUT': False,
     'LEXER': False,
     'PARSER': False,
     'OUTPUT': False,

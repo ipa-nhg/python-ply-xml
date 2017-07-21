@@ -17,6 +17,7 @@ tag_stack = []
 
 # Grammer
 
+# ROOT ELEMENT = SCXML
 def p_root_element(p):
     '''root : element
             | element PCDATA
@@ -25,6 +26,7 @@ def p_root_element(p):
 
     p[0] = p[1]
 
+# not needed for scxml
 def p_root_pcdata_element(p):
     '''root : PCDATA element
             | PCDATA element PCDATA
@@ -33,6 +35,9 @@ def p_root_pcdata_element(p):
 
     p[0] = p[2]
 
+
+# tag 
+# <children> OR <children/>
 def p_element(p):
     '''element : opentag children closetag
                | lonetag
@@ -44,7 +49,7 @@ def p_element(p):
 
     p[0] = p[1]
 
-# tag
+# <name atrr="">
 def p_opentag(p):
     '''opentag : OPENTAGOPEN TAGATTRNAME attributes TAGCLOSE
     '''
@@ -53,6 +58,7 @@ def p_opentag(p):
     tag_stack.append(p[2])
     p[0] = DOM.Element(p[2], p[3])
 
+# </name>
 def p_closetag(p):
     '''closetag : CLOSETAGOPEN TAGATTRNAME TAGCLOSE
     '''
@@ -61,13 +67,17 @@ def p_closetag(p):
     n = tag_stack.pop()
     if p[2] != n:
         raise ParserError('Close tag name ("%s") does not match the corresponding open tag ("%s").' % (p[2], n))
-
+# <name atrr="" />
 def p_lonetag(p):
     '''lonetag : OPENTAGOPEN TAGATTRNAME attributes LONETAGCLOSE
     '''
     _parser_trace(p)
 
     p[0] = DOM.Element(p[2], p[3])
+
+
+
+
 
 # attr
 def p_attributes(p):
@@ -132,6 +142,8 @@ def p_empty(p):
     '''empty :'''
     pass
 
+
+
 # Error rule for syntax errors
 class ParserError(Exception):
     pass
@@ -165,10 +177,15 @@ class DOM:
             self.children = children
 
         def __str__(self):
+            if self.name == 'scxml':
+              print "root element scxml" 
+              print self.name
+
             attributes_str = ''
             for attr in self.attributes:
                 attributes_str += ' %s="%s"' % (attr, _xml_escape(self.attributes[attr]))
 
+            #print attributes_str
             children_str = ''
             for child in self.children:
                 if isinstance(child, self.__class__):
@@ -235,7 +252,7 @@ def xml_parse(data):
     yacc.yacc(method="SLR")
 
     _debug_header('PARSER')
-    root = yacc.parse(data, lexer=xml_lexer.lexer, debug=True)
+    root = yacc.parse(data, lexer=xml_lexer.lexer, debug=False)
     _debug_footer('PARSER')
 
     _debug_header('OUTPUT')

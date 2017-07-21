@@ -11,7 +11,7 @@ import scxmlparse
 
 
 class XmlLexer:
-    '''The XML lexer'''
+    '''The SCXML lexer'''
 
     # states:
     #   tag:        The document tag context
@@ -22,11 +22,18 @@ class XmlLexer:
         ('tag', 'exclusive'),
         ('attrvalue1', 'exclusive'),
         ('attrvalue2', 'exclusive'),
-        ('state','exclusive')
+        ('state', 'exclusive'),
+        ('scxml', 'exclusive')
     )
+
+##########################################################
+#################SCXML specific ##########################
+##########################################################
 
     keywords= ( 'FINAL',  'INITIAL',  'LOG', 'ONENTRY', 'ONEXIT', 'PARALLEL',  'SCXML', 'STATE', 'TRANSITION') # 'ASSIGN', 'CANCEL', 'CONTENT', 'DATA', 'DATAMODEL', 'DONEDATA', 'ELSE', 'ELSEIF', 'FINALIZE', 'FOREACH', 'HISTORY', 'IF', 'INVOKE','PARAM', 'RAISE', 'SCRIPT', 'SEND', 'VALIDATE'
 
+##########################################################
+##########################################################
 
     tokens = keywords + (
         # state: INITIAL
@@ -61,9 +68,7 @@ class XmlLexer:
         t.lexer.skip(1)
         pass
 
-
     # INITIAL
-
     t_ignore  = ''
 
     def t_CLOSETAGOPEN(self, t):
@@ -80,10 +85,6 @@ class XmlLexer:
         '[^<]+'
         return t
 
-    def t_STATE(self, t):
-        r'<state'
-        t.lexer.push_state('state')
-        return t
 
     # tag: name
 
@@ -148,14 +149,24 @@ class XmlLexer:
 
     t_attrvalue2_ignore  = ''
 
-    # state
+##########################################################
+#################SCXML specific ##########################
+##########################################################
 
-    def t_state_STATE(self, t):
-        r'"'
-        t.lexer.pop_state()
+    # ROOT - SCXML
+    def t_SCXML(self, t):
+        r'<scxml'
         return t
 
-    t_state_ignore  = ''
+    # CHILDREN OF ROOT: state, parallel, final, datamodel, script
+    def t_STATE(self, t):
+        r'<state'
+        t.lexer.push_state('state')
+        return t
+
+###########################################################
+##########################################################
+
 
     # misc
 
@@ -178,6 +189,13 @@ class XmlLexer:
             tok = self.lexer.token()
             if not tok: break
             self._debug_print_('LEXER', '[%-12s] %s' % (self.lexer.lexstate, tok))
+
+
+
+
+
+
+
 
 ################################
 # DEBUG
